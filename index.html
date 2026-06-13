@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin - WMPKD</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css"/>
+  <script src="https://www.gstatic.com/firebasejs/12.14.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore-compat.js"></script>
+  <style> 
+    body { font-family: 'Inter', system-ui, sans-serif; } 
+  </style>
+</head>
+<body class="bg-gray-50">
+
+  <div class="min-h-screen flex">
+    <!-- Sidebar -->
+    <div class="w-64 bg-white shadow-xl p-6">
+      <div class="text-3xl font-bold text-orange-600 mb-10">WMPKD <span class="text-sm text-gray-500">Admin</span></div>
+      
+      <nav class="space-y-2">
+        <a href="#" onclick="showSection('dashboard')" class="flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-orange-50 active">📊 Dashboard</a>
+        <a href="#" onclick="showSection('products')" class="flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-orange-50">📦 Products</a>
+        <a href="#" onclick="showSection('orders')" class="flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-orange-50">📋 Orders</a>
+      </nav>
+    </div>
+
+    <!-- Main Content -->
+    <div class="flex-1 p-8">
+      <div class="flex justify-between items-center mb-10">
+        <h1 id="page-title" class="text-4xl font-bold">Dashboard</h1>
+        <div class="flex items-center gap-4">
+          <button onclick="logout()" class="px-5 py-3 text-red-600 hover:bg-red-50 rounded-2xl">Logout</button>
+        </div>
+      </div>
+
+      <!-- Dashboard Section -->
+      <div id="dashboard-section">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+          <div class="bg-white p-8 rounded-3xl shadow">
+            <p class="text-gray-500">Total Products</p>
+            <p id="total-products" class="text-5xl font-bold text-orange-600 mt-4">0</p>
+          </div>
+          <div class="bg-white p-8 rounded-3xl shadow">
+            <p class="text-gray-500">Total Orders</p>
+            <p id="total-orders" class="text-5xl font-bold text-orange-600 mt-4">0</p>
+          </div>
+          <div class="bg-white p-8 rounded-3xl shadow">
+            <p class="text-gray-500">Total Income</p>
+            <p id="total-income" class="text-5xl font-bold text-orange-600 mt-4">₦0</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Products Section -->
+      <div id="products-section" class="hidden">
+        <h2 class="text-3xl font-semibold mb-8">Add New Product</h2>
+        
+        <div class="bg-white p-8 rounded-3xl shadow mb-12">
+          <div class="grid md:grid-cols-2 gap-8">
+            <div>
+              <label class="block text-sm font-medium mb-2">Product Name</label>
+              <input id="prod-name" class="w-full px-5 py-4 border rounded-2xl" placeholder="e.g. Chin Chin">
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2">Price (₦)</label>
+              <input id="prod-price" type="number" class="w-full px-5 py-4 border rounded-2xl">
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-sm font-medium mb-2">Description</label>
+              <textarea id="prod-desc" class="w-full px-5 py-4 border rounded-2xl" rows="3"></textarea>
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2">Category</label>
+              <select id="prod-category" class="w-full px-5 py-4 border rounded-2xl">
+                <option value="crunchy">Crunchy</option>
+                <option value="sweet">Sweet</option>
+                <option value="spicy">Spicy</option>
+                <option value="pastries">Pastries</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2">Image (Cloudinary)</label>
+              <input type="file" id="prod-image" accept="image/*" class="w-full px-5 py-4 border rounded-2xl">
+            </div>
+          </div>
+          
+          <button onclick="uploadProduct()" 
+                  class="mt-8 px-10 py-4 bg-orange-600 text-white rounded-2xl font-semibold">
+            Upload Product to Cloudinary + Firebase
+          </button>
+        </div>
+
+        <h2 class="text-2xl font-semibold mb-6">All Products</h2>
+        <div id="admin-products-list" class="grid grid-cols-1 md:grid-cols-3 gap-6"></div>
+      </div>
+
+      <!-- Orders Section -->
+      <div id="orders-section" class="hidden">
+        <h2 class="text-3xl font-semibold mb-8">Recent Orders</h2>
+        <div id="orders-list" class="space-y-6"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../script.js"></script>
+  <script>
+    // Simple Admin Password (change this later)
+    const ADMIN_PASSWORD = "wmpkd123";
+
+    if (!localStorage.getItem('isAdmin')) {
+      const pass = prompt("Enter Admin Password:");
+      if (pass !== ADMIN_PASSWORD) {
+        alert("Access Denied");
+        window.location.href = '../index.html';
+      } else {
+        localStorage.setItem('isAdmin', 'true');
+      }
+    }
+
+    const db = firebase.firestore();
+
+    function showSection(section) {
+      document.querySelectorAll('#dashboard-section, #products-section, #orders-section').forEach(s => s.classList.add('hidden'));
+      document.getElementById(section + '-section').classList.remove('hidden');
+      document.getElementById('page-title').textContent = section === 'dashboard' ? 'Dashboard' : 
+                                                        section === 'products' ? 'Manage Products' : 'Orders';
+    }
+
+    async function uploadProduct() {
+      const name = document.getElementById('prod-name').value;
+      const price = parseInt(document.getElementById('prod-price').value);
+      const description = document.getElementById('prod-desc').value;
+      const category = document.getElementById('prod-category').value;
+      const file = document.getElementById('prod-image').files[0];
+
+      if (!name || !price || !file) {
+        alert("Name, price and image are required");
+        return;
+      }
+
+      // Cloudinary Upload
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('upload_preset', 'WMPKDSE');
+
+      const cloudRes = await fetch('https://api.cloudinary.com/v1_1/dnk1ln0uh/image/upload', {
+        method: 'POST',
+        body: formData
+      });
+      const cloudData = await cloudRes.json();
+
+      // Save to Firebase
+      await db.collection("products").add({
+        name,
+        price,
+        description,
+        category,
+        imageUrl: cloudData.secure_url,
+        createdAt: new Date()
+      });
+
+      alert("Product uploaded successfully!");
+      loadAdminProducts();
+    }
+
+    async function loadAdminProducts() {
+      const snapshot = await db.collection("products").get();
+      const container = document.getElementById('admin-products-list');
+      container.innerHTML = snapshot.docs.map(doc => {
+        const p = doc.data();
+        return `
+          <div class="bg-white rounded-3xl overflow-hidden shadow">
+            <img src="${p.imageUrl}" class="w-full h-48 object-cover">
+            <div class="p-5">
+              <h3 class="font-bold">${p.name}</h3>
+              <p class="text-orange-600">₦${p.price}</p>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Load Dashboard Stats
+    async function loadDashboard() {
+      const products = await db.collection("products").get();
+      document.getElementById('total-products').textContent = products.size;
+      // You can expand orders later
+    }
+
+    loadDashboard();
+    loadAdminProducts();
+    showSection('dashboard');
+  </script>
+</body>
+</html>
